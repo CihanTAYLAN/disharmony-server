@@ -1,0 +1,127 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  imageUrl  String?
+  status    String?  @default("online")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // İlişkiler
+  servers         Server[]          @relation("UserServers") // Kullanıcının oluşturduğu sunucular
+  memberships     ServerMember[] // Kullanıcının üye olduğu sunucular
+  messages        Message[]
+  voiceStates     VoiceState[]
+  RoomParticipant RoomParticipant[]
+
+  @@map("users")
+}
+
+model Server {
+  id          String   @id @default(uuid())
+  name        String
+  description String? // Sunucu açıklaması
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // İlişkiler
+  owner   User           @relation("UserServers", fields: [ownerId], references: [id])
+  rooms   Room[] // Sunucudaki odalar
+  members ServerMember[] // Sunucu üyeleri
+
+  @@map("servers")
+}
+
+model ServerMember {
+  id       String   @id @default(uuid())
+  userId   String
+  serverId String
+  role     String   @default("member") // Üyenin rolü (örn. "admin", "moderator", "member")
+  joinedAt DateTime @default(now())
+
+  // İlişkiler
+  user   User   @relation(fields: [userId], references: [id])
+  server Server @relation(fields: [serverId], references: [id])
+
+  @@map("server_members")
+}
+
+model Room {
+  id        String   @id @default(uuid())
+  name      String
+  type      RoomType // Metin veya ses odası
+  serverId  String // Hangi sunucuya bağlı olduğu
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // İlişkiler
+  server       Server            @relation(fields: [serverId], references: [id])
+  participants RoomParticipant[]
+  messages     Message[]
+  voiceStates  VoiceState[]
+
+  screenSharingEnabled Boolean @default(false) // Ekran paylaşımı destekleniyor mu?
+  videoEnabled         Boolean @default(false) // Görüntü paylaşımı destekleniyor mu?
+
+  @@map("rooms")
+}
+
+model RoomParticipant {
+  id       String    @id @default(uuid())
+  userId   String
+  roomId   String
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  // İlişkiler
+  user User @relation(fields: [userId], references: [id])
+  room Room @relation(fields: [roomId], references: [id])
+
+  @@map("room_participants")
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  // İlişkiler
+  roomId   String
+  room     Room   @relation(fields: [roomId], references: [id])
+  senderId String
+  sender   User   @relation(fields: [senderId], references: [id])
+
+  @@map("messages")
+}
+
+model VoiceState {
+  id         String    @id @default(uuid())
+  roomId     String
+  userId     String
+  isMuted    Boolean   @default(false)
+  isDeafened Boolean   @default(false)
+  joinedAt   DateTime  @default(now())
+  leftAt     DateTime?
+
+  // İlişkiler
+  user User @relation(fields: [userId], references: [id])
+  room Room @relation(fields: [roomId], references: [id])
+
+  @@map("voice_states")
+}
+
+enum RoomType {
+  TEXT
+  VOICE
+}
